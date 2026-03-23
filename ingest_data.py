@@ -1,15 +1,6 @@
 """
 Formula 1 Race Analytics - Data Ingestion Pipeline
-EAS 550 - Data Mining Query Language
-Team: Karisha Ananya Neelakandan, Swaminathan Sankaran, Vishal Ravi Muthaiah
-
-This script loads the Ergast F1 CSV dataset into a Neon PostgreSQL database.
-It is fully idempotent: running it multiple times will not duplicate data.
-It uses UPSERT (INSERT ... ON CONFLICT DO NOTHING) to handle re-runs safely.
-
-Usage:
-    export DATABASE_URL="postgresql://user:pass@host/dbname?sslmode=require"
-    python ingest_data.py
+EAS 550 - DMQL | Team: Karisha, Swaminathan, Vishal
 """
 
 import os
@@ -21,9 +12,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
 from psycopg2.extras import execute_values
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -36,15 +24,8 @@ if not DATABASE_URL:
     logger.error("DATABASE_URL environment variable is not set.")
     sys.exit(1)
 
-# Path to the CSV files (update this to match your local dataset folder)
 CSV_DIR = os.environ.get("CSV_DIR", "./data")
 
-# ---------------------------------------------------------------------------
-# Database Engine with Connection Pooling
-# ---------------------------------------------------------------------------
-# Using QueuePool with conservative settings to avoid exhausting Neon free tier.
-# pool_size=3 keeps connections low; pool_recycle=300 closes idle connections
-# so the Neon compute can auto-pause after 5 minutes of inactivity.
 engine = create_engine(
     DATABASE_URL,
     poolclass=QueuePool,
@@ -52,36 +33,26 @@ engine = create_engine(
     max_overflow=2,
     pool_recycle=300,
     pool_pre_ping=True,
-    connect_args={"options": "-c statement_timeout=30000"},  # 30s timeout
+    connect_args={"options": "-c statement_timeout=30000"},
 )
 
 
-# ---------------------------------------------------------------------------
-# Helper Functions
-# ---------------------------------------------------------------------------
 def clean_column(series: pd.Series, target_type: str = "str") -> pd.Series:
-    """
-    Clean a pandas Series by replacing the Ergast '\\N' null marker
-    with proper Python None/NaN, then optionally casting.
-    """
-    # Ergast uses literal '\\N' string for NULL values
     series = series.replace({"\\N": None, "": None})
 
     if target_type == "int":
-        return pd.to_numeric(series, errors="coerce").astype("Int64")  # nullable int
+        return pd.to_numeric(series, errors="coerce").astype("Int64")
     elif target_type == "float":
         return pd.to_numeric(series, errors="coerce").astype("Float64")
     elif target_type == "date":
         return pd.to_datetime(series, errors="coerce").dt.date
     elif target_type == "time":
-        # Keep as string for TIME columns; PostgreSQL driver handles it
         return series
     else:
         return series
 
 
 def read_csv(filename: str) -> pd.DataFrame:
-    """Read a CSV file from the data directory with Ergast conventions."""
     filepath = os.path.join(CSV_DIR, filename)
     if not os.path.exists(filepath):
         logger.warning(f"File not found: {filepath}. Skipping.")
@@ -92,10 +63,6 @@ def read_csv(filename: str) -> pd.DataFrame:
 
 
 def upsert_dataframe(df: pd.DataFrame, table_name: str, conflict_columns: list):
-    """
-    Perform an idempotent upsert using psycopg2 execute_values for speed.
-    Inserts in batches of 5000 rows. Skips conflicts.
-    """
     if df.empty:
         logger.warning(f"No data to insert for table '{table_name}'. Skipping.")
         return
@@ -110,8 +77,6 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, conflict_columns: list):
         ON CONFLICT ({conflict_list}) DO NOTHING
     """
 
-    # Convert DataFrame to list of tuples, replacing NaN with None
-    # and converting numpy types to native Python types
     def convert(v):
         if pd.isna(v):
             return None
@@ -140,11 +105,6 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, conflict_columns: list):
 
     logger.info(f"Upserted into '{table_name}'.")
 
-
-# ---------------------------------------------------------------------------
-# Table-specific Ingestion Functions
-# (Ordered by dependency: independent tables first, dependent tables last)
-# ---------------------------------------------------------------------------
 
 def ingest_seasons():
     df = read_csv("seasons.csv")
@@ -213,7 +173,6 @@ def ingest_races():
     df["round"] = clean_column(df["round"], "int")
     df["circuit_id"] = clean_column(df["circuit_id"], "int")
     df["date"] = clean_column(df["date"], "date")
-    # Time fields are kept as strings; None where missing
     for col in ["time", "fp1_time", "fp2_time", "fp3_time",
                 "quali_time", "sprint_time"]:
         df[col] = clean_column(df[col], "time")
@@ -261,7 +220,7 @@ def ingest_sprint_results():
                    "position_order", "points", "laps", "time",
                    "milliseconds", "fastest_lap",
                    "fastest_lap_time", "status_id", "rank"]
-    df["fastest_lap_speed"] = None  # not present in CSV
+    df["fastest_lap_speed"] = None
     int_cols = ["sprint_result_id", "race_id", "driver_id", "constructor_id",
                 "number", "grid", "position", "position_order", "laps",
                 "milliseconds", "fastest_lap", "rank", "status_id"]
@@ -333,15 +292,11 @@ def ingest_constructor_results():
     upsert_dataframe(df, "constructor_results", ["constructor_results_id"])
 
 
-# ---------------------------------------------------------------------------
-# Main Execution
-# ---------------------------------------------------------------------------
 def main():
     logger.info("=" * 60)
     logger.info("F1 Race Analytics - Data Ingestion Pipeline")
     logger.info("=" * 60)
 
-    # Verify database connectivity
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -350,7 +305,6 @@ def main():
         logger.error(f"Cannot connect to database: {e}")
         sys.exit(1)
 
-    # Ingest tables in dependency order (parents before children)
     logger.info("--- Phase 1: Independent/Lookup Tables ---")
     ingest_seasons()
     ingest_circuits()
@@ -358,10 +312,10 @@ def main():
     ingest_constructors()
     ingest_status()
 
-    logger.info("--- Phase 2: Races (depends on seasons, circuits) ---")
+    logger.info("--- Phase 2: Races ---")
     ingest_races()
 
-    logger.info("--- Phase 3: Fact Tables (depend on races, drivers, constructors) ---")
+    logger.info("--- Phase 3: Fact Tables ---")
     ingest_results()
     ingest_qualifying()
     ingest_sprint_results()
@@ -375,9 +329,8 @@ def main():
     logger.info("Data ingestion complete. All tables loaded successfully.")
     logger.info("=" * 60)
 
-    # Dispose engine to release all connections (lets Neon compute pause)
     engine.dispose()
-    logger.info("Database connections closed. Neon compute can now auto-pause.")
+    logger.info("Database connections closed.")
 
 
 if __name__ == "__main__":

@@ -1,14 +1,3 @@
--- ============================================================================
--- Formula 1 Race Analytics - Database Schema (3NF Normalized)
--- EAS 550 - Data Mining Query Language
--- Team: Karisha Ananya Neelakandan, Swaminathan Sankaran, Vishal Ravi Muthaiah
--- ============================================================================
--- This script creates all tables for the Formula 1 analytics database.
--- Tables are created in dependency order to satisfy foreign key constraints.
--- The schema is designed in Third Normal Form (3NF).
--- ============================================================================
-
--- Drop tables in reverse dependency order (for idempotent re-runs)
 DROP TABLE IF EXISTS sprint_results CASCADE;
 DROP TABLE IF EXISTS pit_stops CASCADE;
 DROP TABLE IF EXISTS lap_times CASCADE;
@@ -24,17 +13,11 @@ DROP TABLE IF EXISTS drivers CASCADE;
 DROP TABLE IF EXISTS circuits CASCADE;
 DROP TABLE IF EXISTS seasons CASCADE;
 
--- ============================================================================
--- 1. SEASONS (Independent lookup table)
--- ============================================================================
 CREATE TABLE seasons (
     year        INTEGER PRIMARY KEY,
     url         VARCHAR(255) NOT NULL UNIQUE
 );
 
--- ============================================================================
--- 2. CIRCUITS (Independent entity - race venues)
--- ============================================================================
 CREATE TABLE circuits (
     circuit_id   SERIAL PRIMARY KEY,
     circuit_ref  VARCHAR(255) NOT NULL UNIQUE,
@@ -47,9 +30,6 @@ CREATE TABLE circuits (
     url          VARCHAR(255) NOT NULL UNIQUE
 );
 
--- ============================================================================
--- 3. DRIVERS (Independent entity - F1 drivers)
--- ============================================================================
 CREATE TABLE drivers (
     driver_id    SERIAL PRIMARY KEY,
     driver_ref   VARCHAR(255) NOT NULL UNIQUE,
@@ -62,9 +42,6 @@ CREATE TABLE drivers (
     url          VARCHAR(255) NOT NULL UNIQUE
 );
 
--- ============================================================================
--- 4. CONSTRUCTORS (Independent entity - racing teams)
--- ============================================================================
 CREATE TABLE constructors (
     constructor_id   SERIAL PRIMARY KEY,
     constructor_ref  VARCHAR(255) NOT NULL UNIQUE,
@@ -73,18 +50,11 @@ CREATE TABLE constructors (
     url              VARCHAR(255) NOT NULL UNIQUE
 );
 
--- ============================================================================
--- 5. STATUS (Independent lookup table - race finish statuses)
--- ============================================================================
 CREATE TABLE status (
     status_id   SERIAL PRIMARY KEY,
     status      VARCHAR(255) NOT NULL
 );
 
--- ============================================================================
--- 6. RACES (Depends on: seasons, circuits)
---    Each race belongs to one season and takes place at one circuit.
--- ============================================================================
 CREATE TABLE races (
     race_id     SERIAL PRIMARY KEY,
     year        INTEGER NOT NULL REFERENCES seasons(year),
@@ -107,10 +77,6 @@ CREATE TABLE races (
     UNIQUE (year, round)
 );
 
--- ============================================================================
--- 7. RESULTS (Depends on: races, drivers, constructors, status)
---    Core fact table linking drivers to their race performance.
--- ============================================================================
 CREATE TABLE results (
     result_id        SERIAL PRIMARY KEY,
     race_id          INTEGER NOT NULL REFERENCES races(race_id),
@@ -133,10 +99,6 @@ CREATE TABLE results (
     UNIQUE (race_id, driver_id)
 );
 
--- ============================================================================
--- 8. QUALIFYING (Depends on: races, drivers, constructors)
---    Stores qualifying session results (Q1, Q2, Q3).
--- ============================================================================
 CREATE TABLE qualifying (
     qualify_id       SERIAL PRIMARY KEY,
     race_id          INTEGER NOT NULL REFERENCES races(race_id),
@@ -150,10 +112,6 @@ CREATE TABLE qualifying (
     UNIQUE (race_id, driver_id)
 );
 
--- ============================================================================
--- 9. SPRINT_RESULTS (Depends on: races, drivers, constructors, status)
---    Sprint race results (introduced in 2021 season).
--- ============================================================================
 CREATE TABLE sprint_results (
     sprint_result_id SERIAL PRIMARY KEY,
     race_id          INTEGER NOT NULL REFERENCES races(race_id),
@@ -176,10 +134,6 @@ CREATE TABLE sprint_results (
     UNIQUE (race_id, driver_id)
 );
 
--- ============================================================================
--- 10. LAP_TIMES (Depends on: races, drivers)
---     Granular lap-by-lap timing data for each driver in each race.
--- ============================================================================
 CREATE TABLE lap_times (
     race_id      INTEGER NOT NULL REFERENCES races(race_id),
     driver_id    INTEGER NOT NULL REFERENCES drivers(driver_id),
@@ -190,10 +144,6 @@ CREATE TABLE lap_times (
     PRIMARY KEY (race_id, driver_id, lap)
 );
 
--- ============================================================================
--- 11. PIT_STOPS (Depends on: races, drivers)
---     Pit stop events per driver per race, including duration.
--- ============================================================================
 CREATE TABLE pit_stops (
     race_id      INTEGER NOT NULL REFERENCES races(race_id),
     driver_id    INTEGER NOT NULL REFERENCES drivers(driver_id),
@@ -205,10 +155,6 @@ CREATE TABLE pit_stops (
     PRIMARY KEY (race_id, driver_id, stop)
 );
 
--- ============================================================================
--- 12. DRIVER_STANDINGS (Depends on: races, drivers)
---     Championship standings snapshot after each race.
--- ============================================================================
 CREATE TABLE driver_standings (
     driver_standing_id SERIAL PRIMARY KEY,
     race_id            INTEGER NOT NULL REFERENCES races(race_id),
@@ -220,10 +166,6 @@ CREATE TABLE driver_standings (
     UNIQUE (race_id, driver_id)
 );
 
--- ============================================================================
--- 13. CONSTRUCTOR_STANDINGS (Depends on: races, constructors)
---     Team championship standings snapshot after each race.
--- ============================================================================
 CREATE TABLE constructor_standings (
     constructor_standing_id SERIAL PRIMARY KEY,
     race_id                INTEGER NOT NULL REFERENCES races(race_id),
@@ -235,10 +177,6 @@ CREATE TABLE constructor_standings (
     UNIQUE (race_id, constructor_id)
 );
 
--- ============================================================================
--- 14. CONSTRUCTOR_RESULTS (Depends on: races, constructors)
---     Aggregate constructor points per race.
--- ============================================================================
 CREATE TABLE constructor_results (
     constructor_results_id SERIAL PRIMARY KEY,
     race_id                INTEGER NOT NULL REFERENCES races(race_id),
@@ -248,9 +186,6 @@ CREATE TABLE constructor_results (
     UNIQUE (race_id, constructor_id)
 );
 
--- ============================================================================
--- Performance indexes for common query patterns
--- ============================================================================
 CREATE INDEX idx_races_year ON races(year);
 CREATE INDEX idx_races_circuit ON races(circuit_id);
 CREATE INDEX idx_results_race ON results(race_id);
