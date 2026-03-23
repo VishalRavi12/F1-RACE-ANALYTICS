@@ -16,6 +16,15 @@ The schema consists of 14 tables in Third Normal Form (3NF):
 - **Dependent table:** `races` (references `seasons` and `circuits`)
 - **Fact tables:** `results`, `qualifying`, `sprint_results`, `lap_times`, `pit_stops`, `driver_standings`, `constructor_standings`, `constructor_results`
 
+## Database Schema (`schema.sql`)
+
+Creates all 14 tables in dependency order with appropriate constraints:
+
+- **Data types:** `INTEGER`, `SERIAL`, `VARCHAR`, `DECIMAL`, `DATE`, `TIME`, `BIGINT`
+- **Constraints:** `PRIMARY KEY`, `FOREIGN KEY`, `NOT NULL`, `UNIQUE`, `CHECK`
+- **Idempotent:** Drops all tables before recreating (`DROP TABLE IF EXISTS ... CASCADE`)
+- **Indexes:** Performance indexes on frequently queried columns (`race_id`, `driver_id`, `constructor_id`, etc.)
+
 ## Data Ingestion Pipeline (`ingest_data.py`)
 
 The ingestion script loads the [Ergast F1 dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data) (14 CSV files) into a Neon PostgreSQL database.
@@ -50,6 +59,15 @@ pip install -r requirements.txt
 # Run ingestion
 python ingest_data.py
 ```
+
+## Security & RBAC (`security.sql`)
+
+Implements Role-Based Access Control with two roles:
+
+- **`analyst_role`** - Read-only (`SELECT`) access on all tables. Intended for data analysts who need to query data but should not modify it.
+- **`app_user_role`** - Read/write (`SELECT`, `INSERT`, `UPDATE`) access on all tables and sequences. Intended for application-level access (e.g., Streamlit/FastAPI).
+
+Both roles use `NOLOGIN` and are designed to be granted to actual database users. `ALTER DEFAULT PRIVILEGES` ensures future tables automatically inherit the same permissions.
 
 ## Project Structure
 
