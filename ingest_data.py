@@ -19,6 +19,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
+from psycopg2.extras import execute_values
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -92,8 +93,8 @@ def read_csv(filename: str) -> pd.DataFrame:
 
 def upsert_dataframe(df: pd.DataFrame, table_name: str, conflict_columns: list):
     """
-    Perform an idempotent upsert: INSERT rows, skip on conflict.
-    This ensures running the script multiple times does not duplicate data.
+    Perform an idempotent upsert using psycopg2 execute_values for speed.
+    Inserts in batches of 5000 rows. Skips conflicts.
     """
     if df.empty:
         logger.warning(f"No data to insert for table '{table_name}'. Skipping.")
@@ -101,19 +102,41 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, conflict_columns: list):
 
     cols = df.columns.tolist()
     col_list = ", ".join(cols)
-    val_placeholders = ", ".join([f":{c}" for c in cols])
     conflict_list = ", ".join(conflict_columns)
 
     sql = f"""
         INSERT INTO {table_name} ({col_list})
-        VALUES ({val_placeholders})
+        VALUES %s
         ON CONFLICT ({conflict_list}) DO NOTHING
     """
 
-    records = df.where(df.notna(), None).to_dict(orient="records")
+    # Convert DataFrame to list of tuples, replacing NaN with None
+    # and converting numpy types to native Python types
+    def convert(v):
+        if pd.isna(v):
+            return None
+        if isinstance(v, (np.integer,)):
+            return int(v)
+        if isinstance(v, (np.floating,)):
+            return float(v)
+        return v
 
-    with engine.begin() as conn:
-        conn.execute(text(sql), records)
+    records = [
+        tuple(convert(v) for v in row)
+        for row in df.itertuples(index=False, name=None)
+    ]
+
+    BATCH_SIZE = 5000
+    conn = engine.raw_connection()
+    try:
+        cur = conn.cursor()
+        for i in range(0, len(records), BATCH_SIZE):
+            batch = records[i:i + BATCH_SIZE]
+            execute_values(cur, sql, batch, page_size=BATCH_SIZE)
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
 
     logger.info(f"Upserted into '{table_name}'.")
 
@@ -254,6 +277,7 @@ def ingest_lap_times():
         return
     df.columns = ["race_id", "driver_id", "lap", "position", "time",
                    "milliseconds"]
+    df = df.dropna(subset=["race_id", "driver_id", "lap"])
     for col in ["race_id", "driver_id", "lap", "position"]:
         df[col] = clean_column(df[col], "int")
     df["milliseconds"] = clean_column(df["milliseconds"], "int")
