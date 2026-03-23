@@ -86,7 +86,7 @@ def read_csv(filename: str) -> pd.DataFrame:
         logger.warning(f"File not found: {filepath}. Skipping.")
         return pd.DataFrame()
     df = pd.read_csv(filepath, encoding="utf-8", na_values=["\\N", ""])
-    logger.info(f"Read {len(df)} rows from {filename}")
+    logger.info(f"Read {filename}")
     return df
 
 
@@ -115,7 +115,7 @@ def upsert_dataframe(df: pd.DataFrame, table_name: str, conflict_columns: list):
     with engine.begin() as conn:
         conn.execute(text(sql), records)
 
-    logger.info(f"Upserted {len(records)} rows into '{table_name}'.")
+    logger.info(f"Upserted into '{table_name}'.")
 
 
 # ---------------------------------------------------------------------------
@@ -236,8 +236,9 @@ def ingest_sprint_results():
     df.columns = ["sprint_result_id", "race_id", "driver_id", "constructor_id",
                    "number", "grid", "position", "position_text",
                    "position_order", "points", "laps", "time",
-                   "milliseconds", "fastest_lap", "rank",
-                   "fastest_lap_time", "fastest_lap_speed", "status_id"]
+                   "milliseconds", "fastest_lap",
+                   "fastest_lap_time", "status_id", "rank"]
+    df["fastest_lap_speed"] = None  # not present in CSV
     int_cols = ["sprint_result_id", "race_id", "driver_id", "constructor_id",
                 "number", "grid", "position", "position_order", "laps",
                 "milliseconds", "fastest_lap", "rank", "status_id"]
