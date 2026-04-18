@@ -6,6 +6,12 @@ This repository now includes:
 - **Phase 1**: 3NF OLTP schema, ingestion pipeline, and RBAC.
 - **Phase 2**: dbt star-schema analytics layer, data quality tests, SQL linting CI, advanced analytical SQL, and performance tuning artifacts.
 
+### Validation Snapshot (Phase 2)
+- `dbt test` completed successfully (`PASS=41, ERROR=0`).
+- `dbt docs generate` successfully produced catalog artifacts.
+- `sqlfluff lint dbt/models --config .sqlfluff` passed.
+- `sqlfluff lint sql/analysis --dialect postgres --templater jinja` passed.
+
 ## Team
 - Karisha Ananya Neelakandan
 - Swaminathan Sankaran
@@ -44,6 +50,7 @@ Models:
 - **Staging (views)**: `stg_*` models in [`dbt/models/staging`](dbt/models/staging)
 - **Dimensions (tables)**: `dim_driver`, `dim_constructor`, `dim_circuit`, `dim_race`, `dim_status`
 - **Fact (table)**: `fact_race_results` (grain: one driver per race)
+- **Data harmonization in modeling**: de-duplicates ambiguous source rows in `qualifying` and `results` using deterministic `row_number()` ranking before downstream marts.
 - **Marts (tables)**:
   - `mart_quali_vs_finish`
   - `mart_pitstop_impact`
@@ -86,7 +93,10 @@ Workflow behavior on `pull_request` to `main`:
 - Baseline `EXPLAIN ANALYZE`: [`sql/performance/query_b_baseline_explain.sql`](sql/performance/query_b_baseline_explain.sql)
 - Strategic indexes: [`sql/performance/create_performance_indexes.sql`](sql/performance/create_performance_indexes.sql)
 - Post-index `EXPLAIN ANALYZE`: [`sql/performance/query_b_post_index_explain.sql`](sql/performance/query_b_post_index_explain.sql)
-- Report template: [`reports/performance_tuning_report.md`](reports/performance_tuning_report.md)
+- Final report: [`reports/performance_tuning_report.md`](reports/performance_tuning_report.md)
+
+Measured outcome from Query B tuning:
+- Execution time improved from `84.163 ms` to `46.564 ms` (`44.67%` faster).
 
 `schema.sql` also includes the three composite indexes used for Query B optimization.
 
@@ -116,6 +126,13 @@ cp .env.example .env
 ```
 
 `ingest_data.py` auto-loads `.env` via `python-dotenv`.
+For `dbt` and `psql`, load `.env` into your shell:
+
+```bash
+set -a
+source .env
+set +a
+```
 
 For dbt (local + CI parity):
 
@@ -137,6 +154,8 @@ python ingest_data.py
 psql "$DATABASE_URL" -f security.sql
 ```
 
+If your Phase 1 database is already populated, you can skip re-running `ingest_data.py`.
+
 ## 4) Run Phase 2 dbt pipeline
 
 ```bash
@@ -157,9 +176,9 @@ sqlfluff lint sql/analysis --dialect postgres --templater jinja
 ## 6) Run performance tuning sequence
 
 ```bash
-psql "$DATABASE_URL" -f sql/performance/query_b_baseline_explain.sql
+psql "$DATABASE_URL" -P pager=off -f sql/performance/query_b_baseline_explain.sql
 psql "$DATABASE_URL" -f sql/performance/create_performance_indexes.sql
-psql "$DATABASE_URL" -f sql/performance/query_b_post_index_explain.sql
+psql "$DATABASE_URL" -P pager=off -f sql/performance/query_b_post_index_explain.sql
 ```
 
 Then fill measured timings in [`reports/performance_tuning_report.md`](reports/performance_tuning_report.md).
