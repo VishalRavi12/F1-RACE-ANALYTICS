@@ -8,6 +8,20 @@ on:
 jobs:
   sqlfluff_lint:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: lint_user
+          POSTGRES_PASSWORD: lint_password
+          POSTGRES_DB: lint_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DBT_HOST: localhost
       DBT_PORT: "5432"
