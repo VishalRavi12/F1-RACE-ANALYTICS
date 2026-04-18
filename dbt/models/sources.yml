@@ -1,0 +1,51 @@
+version: 2
+
+sources:
+  - name: f1_oltp
+    database: "{{ env_var('DBT_DATABASE') }}"
+    schema: public
+    tables:
+      - name: seasons
+        columns:
+          - name: year
+            tests:
+              - not_null
+              - unique
+      - name: circuits
+        columns:
+          - name: circuit_id
+            tests:
+              - not_null
+              - unique
+      - name: drivers
+        columns:
+          - name: driver_id
+            tests:
+              - not_null
+              - unique
+      - name: constructors
+        columns:
+          - name: constructor_id
+            tests:
+              - not_null
+              - unique
+      - name: status
+        columns:
+          - name: status_id
+            tests:
+              - not_null
+              - unique
+      - name: races
+        columns:
+          - name: race_id
+            tests:
+              - not_null
+              - unique
+      - name: results
+        columns:
+          - name: result_id
+            tests:
+              - not_null
+              - unique
+      - name: qualifying
+      - name: pit_stops

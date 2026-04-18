@@ -1,0 +1,28 @@
+                                                                                   QUERY PLAN                                                                                    
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Left Join  (cost=765.57..1793.98 rows=1703 width=103) (actual time=14.273..45.863 rows=11013 loops=1)
+   Hash Cond: ((res.race_id = ps.race_id) AND (res.driver_id = ps.driver_id))
+   ->  Hash Join  (cost=47.65..1062.86 rows=1703 width=31) (actual time=0.273..27.933 rows=11013 loops=1)
+         Hash Cond: (res.race_id = r.race_id)
+         ->  Nested Loop  (cost=0.30..1011.00 rows=1716 width=27) (actual time=0.031..25.515 rows=11013 loops=1)
+               ->  Seq Scan on qualifying q  (cost=0.00..219.14 rows=11014 width=12) (actual time=0.007..0.806 rows=11014 loops=1)
+               ->  Memoize  (cost=0.30..0.48 rows=1 width=19) (actual time=0.002..0.002 rows=1 loops=11014)
+                     Cache Key: q.race_id, q.driver_id
+                     Cache Mode: logical
+                     Hits: 0  Misses: 11014  Evictions: 0  Overflows: 0  Memory Usage: 1352kB
+                     ->  Index Scan using idx_results_race_driver_position_order on results res  (cost=0.29..0.47 rows=1 width=19) (actual time=0.001..0.001 rows=1 loops=11014)
+                           Index Cond: ((race_id = q.race_id) AND (driver_id = q.driver_id))
+         ->  Hash  (cost=32.71..32.71 rows=1171 width=8) (actual time=0.238..0.239 rows=1171 loops=1)
+               Buckets: 2048  Batches: 1  Memory Usage: 62kB
+               ->  Seq Scan on races r  (cost=0.00..32.71 rows=1171 width=8) (actual time=0.003..0.119 rows=1171 loops=1)
+   ->  Hash  (cost=684.68..684.68 rows=2216 width=80) (actual time=13.993..13.994 rows=11285 loops=1)
+         Buckets: 16384 (originally 4096)  Batches: 1 (originally 1)  Memory Usage: 839kB
+         ->  Subquery Scan on ps  (cost=629.28..684.68 rows=2216 width=80) (actual time=6.590..12.084 rows=11285 loops=1)
+               ->  HashAggregate  (cost=629.28..662.52 rows=2216 width=80) (actual time=6.589..11.122 rows=11285 loops=1)
+                     Group Key: pit_stops.race_id, pit_stops.driver_id
+                     Batches: 1  Memory Usage: 2193kB
+                     ->  Seq Scan on pit_stops  (cost=0.00..407.64 rows=22164 width=16) (actual time=0.003..1.350 rows=22164 loops=1)
+ Planning Time: 1.698 ms
+ Execution Time: 46.564 ms
+(24 rows)
+

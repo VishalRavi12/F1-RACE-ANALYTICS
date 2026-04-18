@@ -11,6 +11,7 @@ import numpy as np
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
 from psycopg2.extras import execute_values
+from dotenv import load_dotenv
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,6 +19,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:

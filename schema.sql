@@ -197,3 +197,10 @@ CREATE INDEX idx_pit_stops_race ON pit_stops(race_id);
 CREATE INDEX idx_qualifying_race ON qualifying(race_id);
 CREATE INDEX idx_driver_standings_race ON driver_standings(race_id);
 CREATE INDEX idx_constructor_standings_race ON constructor_standings(race_id);
+
+CREATE INDEX IF NOT EXISTS idx_qualifying_race_driver_position
+    ON qualifying (race_id, driver_id, position);
+CREATE INDEX IF NOT EXISTS idx_pit_stops_race_driver_ms
+    ON pit_stops (race_id, driver_id, milliseconds);
+CREATE INDEX IF NOT EXISTS idx_results_race_driver_position_order
+    ON results (race_id, driver_id, position_order);

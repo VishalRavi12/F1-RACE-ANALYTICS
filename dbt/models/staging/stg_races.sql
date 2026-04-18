@@ -1,0 +1,20 @@
+select
+    race_id,
+    year as season_year,
+    round as race_round,
+    circuit_id,
+    name as race_name,
+    date as race_date,
+    time as race_time,
+    url as race_url,
+    fp1_date,
+    fp1_time,
+    fp2_date,
+    fp2_time,
+    fp3_date,
+    fp3_time,
+    quali_date,
+    quali_time,
+    sprint_date,
+    sprint_time
+from {{ source('f1_oltp', 'races') }}

@@ -1,84 +1,203 @@
 # F1-RACE-ANALYTICS
 
-Formula 1 Race Analytics - Database Design & Data Ingestion Pipeline
+Formula 1 Race Analytics for **EAS 550 (DMQL)**.
 
-**Course:** EAS 550 - Data Mining Query Language
+This repository now includes:
+- **Phase 1**: 3NF OLTP schema, ingestion pipeline, and RBAC.
+- **Phase 2**: dbt star-schema analytics layer, data quality tests, SQL linting CI, advanced analytical SQL, and performance tuning artifacts.
 
-**Team:** Karisha Ananya Neelakandan, Swaminathan Sankaran, Vishal Ravi Muthaiah
+## Team
+- Karisha Ananya Neelakandan
+- Swaminathan Sankaran
+- Vishal Ravi Muthaiah
 
-## ER Diagram
+## Dataset
+- Ergast F1 dataset (Kaggle): https://www.kaggle.com/datasets/jtrotman/formula-1-race-data
 
-![ER Diagram](er_diagram.jpeg)
+## Phase 1 (Completed)
 
-The schema consists of 14 tables in Third Normal Form (3NF):
+### Core artifacts
+- 3NF schema: [`schema.sql`](schema.sql)
+- Ingestion pipeline: [`ingest_data.py`](ingest_data.py)
+- RBAC (bonus): [`security.sql`](security.sql)
+- ER diagram: [`er_diagram.jpeg`](er_diagram.jpeg)
+- 3NF report: [`DMQL_PHASE_1_REPORT.pdf`](DMQL_PHASE_1_REPORT.pdf)
 
-- **Independent tables:** `seasons`, `circuits`, `drivers`, `constructors`, `status`
-- **Dependent table:** `races` (references `seasons` and `circuits`)
-- **Fact tables:** `results`, `qualifying`, `sprint_results`, `lap_times`, `pit_stops`, `driver_standings`, `constructor_standings`, `constructor_results`
+### Ingestion behavior
+- Loads 14 CSV files into Neon PostgreSQL.
+- Handles null markers (`\\N`) and type cleanup.
+- Inserts in dependency order to satisfy foreign keys.
+- Uses conflict-safe inserts (`ON CONFLICT DO NOTHING`) for idempotency.
 
-## Database Schema (`schema.sql`)
+## Phase 2 (Implemented)
 
-Creates all 14 tables in dependency order with appropriate constraints:
+### dbt analytics project
+- Root: [`dbt/`](dbt/)
+- dbt config: [`dbt/dbt_project.yml`](dbt/dbt_project.yml)
+- profile (env-driven): [`dbt/profiles.yml`](dbt/profiles.yml)
+- packages: [`dbt/packages.yml`](dbt/packages.yml)
 
-- **Data types:** `INTEGER`, `SERIAL`, `VARCHAR`, `DECIMAL`, `DATE`, `TIME`, `BIGINT`
-- **Constraints:** `PRIMARY KEY`, `FOREIGN KEY`, `NOT NULL`, `UNIQUE`, `CHECK`
-- **Idempotent:** Drops all tables before recreating (`DROP TABLE IF EXISTS ... CASCADE`)
-- **Indexes:** Performance indexes on frequently queried columns (`race_id`, `driver_id`, `constructor_id`, etc.)
+### Star schema
+- Diagram: [`docs/star_schema_diagram.md`](docs/star_schema_diagram.md)
 
-## Data Ingestion Pipeline (`ingest_data.py`)
+Models:
+- **Staging (views)**: `stg_*` models in [`dbt/models/staging`](dbt/models/staging)
+- **Dimensions (tables)**: `dim_driver`, `dim_constructor`, `dim_circuit`, `dim_race`, `dim_status`
+- **Fact (table)**: `fact_race_results` (grain: one driver per race)
+- **Marts (tables)**:
+  - `mart_quali_vs_finish`
+  - `mart_pitstop_impact`
+  - `mart_driver_constructor_performance`
 
-The ingestion script loads the [Ergast F1 dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data) (14 CSV files) into a Neon PostgreSQL database.
+### Data quality tests
+- Source/model tests and business-rule tests are defined in:
+  - [`dbt/models/sources.yml`](dbt/models/sources.yml)
+  - [`dbt/models/model_tests.yml`](dbt/models/model_tests.yml)
 
-### How It Works
+Includes:
+- PK uniqueness and not-null checks
+- Fact-to-dimension referential integrity checks
+- Business rules via `dbt_utils.expression_is_true`:
+  - `position_order is null or position_order > 0`
+  - `grid is null or grid >= 0`
+  - `points >= 0`
 
-1. **Configuration** - Reads the `DATABASE_URL` environment variable and sets up a SQLAlchemy engine with connection pooling (`pool_size=3`, `pool_recycle=300s`) optimized for Neon's free tier.
+### SQL linting and CI/CD
+- SQLFluff config: [`.sqlfluff`](.sqlfluff)
+- GitHub Actions workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
-2. **Data Cleaning (`clean_column`)** - Replaces Ergast's `\N` null markers with Python `None` and casts columns to appropriate types (`int`, `float`, `date`, `time`).
+Workflow behavior on `pull_request` to `main`:
+1. `sqlfluff_lint` job
+   - Installs `dbt-postgres`, `sqlfluff`, `sqlfluff-templater-dbt`
+   - Runs lint on dbt models and advanced SQL queries
+2. `dbt_test` job
+   - Uses Neon credentials from GitHub Secrets
+   - Runs `dbt deps` and `dbt build --select +fact_race_results+`
 
-3. **Batch Upsert (`upsert_dataframe`)** - Uses `psycopg2.extras.execute_values` to insert rows in batches of 5000 for high performance. Each insert uses `ON CONFLICT DO NOTHING` to make the script fully idempotent (safe to re-run without duplicating data).
+### Advanced analytical SQL (CTE + window functions)
+- Query A (qualifying vs finish over/under-performance):
+  - [`sql/analysis/query_a_quali_to_finish_overperformers.sql`](sql/analysis/query_a_quali_to_finish_overperformers.sql)
+- Query B (pit-stop strategy impact controlling for qualifying):
+  - [`sql/analysis/query_b_pitstop_strategy_impact.sql`](sql/analysis/query_b_pitstop_strategy_impact.sql)
+- Query C (constructor consistency by circuit and season):
+  - [`sql/analysis/query_c_constructor_consistency_by_circuit.sql`](sql/analysis/query_c_constructor_consistency_by_circuit.sql)
 
-4. **Dependency-Ordered Loading** - Tables are loaded in three phases to satisfy foreign key constraints:
-   - **Phase 1:** Independent/lookup tables (`seasons`, `circuits`, `drivers`, `constructors`, `status`)
-   - **Phase 2:** `races` (depends on `seasons` and `circuits`)
-   - **Phase 3:** Fact tables (`results`, `qualifying`, `sprint_results`, `lap_times`, `pit_stops`, `driver_standings`, `constructor_standings`, `constructor_results`)
+### Performance tuning artifacts
+- Baseline `EXPLAIN ANALYZE`: [`sql/performance/query_b_baseline_explain.sql`](sql/performance/query_b_baseline_explain.sql)
+- Strategic indexes: [`sql/performance/create_performance_indexes.sql`](sql/performance/create_performance_indexes.sql)
+- Post-index `EXPLAIN ANALYZE`: [`sql/performance/query_b_post_index_explain.sql`](sql/performance/query_b_post_index_explain.sql)
+- Report template: [`reports/performance_tuning_report.md`](reports/performance_tuning_report.md)
 
-5. **Connection Cleanup** - Disposes the engine after ingestion so Neon compute can auto-pause.
+`schema.sql` also includes the three composite indexes used for Query B optimization.
 
-### Usage
+## Setup
+
+## 1) Python dependencies
 
 ```bash
-# Set connection string
-export DATABASE_URL="postgresql://user:pass@host/dbname?sslmode=require"
-
-# Install dependencies
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
 
-# Run schema (creates tables)
-# Use Neon SQL Editor or: psql "$DATABASE_URL" -f schema.sql
+## 2) Environment variables
 
-# Run ingestion
+For ingestion (either export directly or use a local `.env` file):
+
+```bash
+export DATABASE_URL="postgresql://user:pass@host/dbname?sslmode=require"
+export CSV_DIR="./data"
+```
+
+`.env` option:
+
+```bash
+cp .env.example .env
+# edit .env with your real values
+```
+
+`ingest_data.py` auto-loads `.env` via `python-dotenv`.
+
+For dbt (local + CI parity):
+
+```bash
+export DBT_HOST="<neon-host>"
+export DBT_PORT="5432"
+export DBT_USER="<db-user>"
+export DBT_PASSWORD="<db-password>"
+export DBT_DATABASE="<db-name>"
+export DBT_SCHEMA="analytics"
+export DBT_THREADS="4"
+```
+
+## 3) Run Phase 1 pipeline
+
+```bash
+psql "$DATABASE_URL" -f schema.sql
 python ingest_data.py
+psql "$DATABASE_URL" -f security.sql
 ```
 
-## Security & RBAC (`security.sql`)
+## 4) Run Phase 2 dbt pipeline
 
-Implements Role-Based Access Control with two roles:
-
-- **`analyst_role`** - Read-only (`SELECT`) access on all tables. Intended for data analysts who need to query data but should not modify it.
-- **`app_user_role`** - Read/write (`SELECT`, `INSERT`, `UPDATE`) access on all tables and sequences. Intended for application-level access (e.g., Streamlit/FastAPI).
-
-Both roles use `NOLOGIN` and are designed to be granted to actual database users. `ALTER DEFAULT PRIVILEGES` ensures future tables automatically inherit the same permissions.
-
-## Project Structure
-
+```bash
+dbt deps --project-dir dbt --profiles-dir dbt
+dbt debug --project-dir dbt --profiles-dir dbt
+dbt build --project-dir dbt --profiles-dir dbt
+dbt test --project-dir dbt --profiles-dir dbt
+dbt docs generate --project-dir dbt --profiles-dir dbt
 ```
-Directory
-├── data/                  # CSV files (not tracked in git)
-├── schema.sql             # Database schema (3NF)
-├── ingest_data.py         # Data ingestion pipeline
-├── security.sql           # RBAC roles (bonus)
-├── er_diagram.jpeg        # Entity-Relationship diagram
-├── requirements.txt       # Python dependencies
-├── .gitignore
+
+## 5) Run SQL lint checks locally
+
+```bash
+sqlfluff lint dbt/models --config .sqlfluff
+sqlfluff lint sql/analysis --dialect postgres --templater jinja
+```
+
+## 6) Run performance tuning sequence
+
+```bash
+psql "$DATABASE_URL" -f sql/performance/query_b_baseline_explain.sql
+psql "$DATABASE_URL" -f sql/performance/create_performance_indexes.sql
+psql "$DATABASE_URL" -f sql/performance/query_b_post_index_explain.sql
+```
+
+Then fill measured timings in [`reports/performance_tuning_report.md`](reports/performance_tuning_report.md).
+
+## GitHub Secrets required for CI
+- `DBT_HOST`
+- `DBT_PORT`
+- `DBT_USER`
+- `DBT_PASSWORD`
+- `DBT_DATABASE`
+- `DBT_SCHEMA`
+- `DBT_THREADS`
+
+## Repository structure
+
+```text
+.
+├── .github/workflows/ci.yml
+├── dbt/
+│   ├── dbt_project.yml
+│   ├── packages.yml
+│   ├── profiles.yml
+│   └── models/
+│       ├── sources.yml
+│       ├── model_tests.yml
+│       ├── staging/
+│       ├── dimensions/
+│       ├── facts/
+│       └── marts/
+├── docs/star_schema_diagram.md
+├── sql/
+│   ├── analysis/
+│   └── performance/
+├── reports/performance_tuning_report.md
+├── schema.sql
+├── ingest_data.py
+├── security.sql
+├── requirements.txt
+├── requirements-dev.txt
 └── README.md
 ```

@@ -1,0 +1,103 @@
+version: 2
+
+models:
+  - name: dim_driver
+    columns:
+      - name: driver_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_constructor
+    columns:
+      - name: constructor_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_circuit
+    columns:
+      - name: circuit_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_race
+    columns:
+      - name: race_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_status
+    columns:
+      - name: status_id
+        tests:
+          - not_null
+          - unique
+
+  - name: fact_race_results
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - race_id
+            - driver_id
+      - dbt_utils.expression_is_true:
+          expression: "position_order is null or position_order > 0"
+      - dbt_utils.expression_is_true:
+          expression: "grid is null or grid >= 0"
+      - dbt_utils.expression_is_true:
+          expression: "points >= 0"
+    columns:
+      - name: race_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_race')
+              field: race_id
+      - name: driver_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_driver')
+              field: driver_id
+      - name: constructor_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_constructor')
+              field: constructor_id
+      - name: status_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_status')
+              field: status_id
+      - name: points
+        tests:
+          - not_null
+      - name: position_order
+        tests:
+          - not_null
+
+  - name: mart_quali_vs_finish
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - race_id
+            - driver_id
+
+  - name: mart_pitstop_impact
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - race_id
+            - driver_id
+
+  - name: mart_driver_constructor_performance
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - season_year
+            - driver_id
+            - constructor_id
