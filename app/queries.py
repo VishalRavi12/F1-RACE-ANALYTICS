@@ -287,3 +287,118 @@ def get_race_detail(race_id: int):
             f.points desc
     """
     return run_query(query, {"race_id": race_id})
+
+
+def get_driver_final_points_table(season_year: int, top_n: int):
+    query = """
+        with driver_totals as (
+            select
+                driver_id,
+                driver_full_name,
+                sum(total_points) as total_points,
+                sum(wins) as wins,
+                sum(podiums) as podiums
+            from mart_driver_constructor_performance
+            where season_year = :season_year
+            group by driver_id, driver_full_name
+        )
+        select
+            dense_rank() over (order by total_points desc, wins desc) as standing_position,
+            driver_full_name,
+            total_points,
+            wins,
+            podiums
+        from driver_totals
+        order by standing_position, driver_full_name
+        limit :top_n
+    """
+    return run_query(query, {"season_year": season_year, "top_n": top_n})
+
+
+def get_constructor_final_points_table(season_year: int, top_n: int):
+    query = """
+        with constructor_totals as (
+            select
+                constructor_id,
+                constructor_name,
+                sum(total_points) as total_points,
+                sum(wins) as wins,
+                sum(podiums) as podiums
+            from mart_driver_constructor_performance
+            where season_year = :season_year
+            group by constructor_id, constructor_name
+        )
+        select
+            dense_rank() over (order by total_points desc, wins desc) as standing_position,
+            constructor_name,
+            total_points,
+            wins,
+            podiums
+        from constructor_totals
+        order by standing_position, constructor_name
+        limit :top_n
+    """
+    return run_query(query, {"season_year": season_year, "top_n": top_n})
+
+
+def get_team_historic_trend(
+    start_year: int,
+    end_year: int,
+    constructors: list[str],
+):
+    params = {"start_year": start_year, "end_year": end_year}
+    constructor_filter, constructor_params = _in_filter(
+        values=constructors,
+        column="constructor_name",
+        param_prefix="team_trend_constructor",
+    )
+    params.update(constructor_params)
+
+    query = f"""
+        select
+            season_year,
+            constructor_name,
+            sum(total_points) as total_points,
+            sum(wins) as wins
+        from mart_driver_constructor_performance
+        where season_year between :start_year and :end_year
+            {constructor_filter}
+        group by season_year, constructor_name
+        order by season_year, total_points desc
+    """
+    return run_query(query, params)
+
+
+def get_track_historic_winners(
+    start_year: int,
+    end_year: int,
+    circuit_name: str,
+):
+    query = """
+        select
+            r.season_year,
+            r.race_name,
+            r.circuit_name,
+            d.driver_full_name as winner_driver,
+            c.constructor_name as winner_constructor,
+            f.points as winner_points
+        from fact_race_results f
+        inner join dim_race r
+            on f.race_id = r.race_id
+        inner join dim_driver d
+            on f.driver_id = d.driver_id
+        inner join dim_constructor c
+            on f.constructor_id = c.constructor_id
+        where r.season_year between :start_year and :end_year
+            and r.circuit_name = :circuit_name
+            and f.position_order = 1
+        order by r.season_year desc
+    """
+    return run_query(
+        query,
+        {
+            "start_year": start_year,
+            "end_year": end_year,
+            "circuit_name": circuit_name,
+        },
+    )
