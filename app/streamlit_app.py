@@ -51,28 +51,163 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    :root {
+        --red: #e10600;
+        --red-dark: #b30500;
+        --ink: #15151a;
+        --ink-2: #2d2d35;
+        --muted: #6b7080;
+        --subtle: #9ca3af;
+        --bg: #ffffff;
+        --bg-2: #f8f9fb;
+        --border: #e5e7eb;
+        --card: #ffffff;
+    }
+
+    /* ── base ── */
     .stApp {
-        background: radial-gradient(
-            circle at top left,
-            #f5f0e6 0%, #f8f8f8 45%, #ffffff 100%
-        );
+        font-family: "Inter", -apple-system, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+    }
+
+    /* ── sidebar ── */
+    [data-testid="stSidebar"] {
+        background: var(--bg-2);
+        border-right: 1px solid var(--border);
+    }
+    [data-testid="stSidebar"] .stMarkdown h3 {
+        color: var(--ink);
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.3rem;
+    }
+
+    /* ── metrics ── */
+    [data-testid="stMetric"] {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.6rem 0.9rem;
+    }
+    [data-testid="stMetricLabel"] {
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    [data-testid="stMetricValue"] {
+        color: var(--ink);
+        font-weight: 700;
+    }
+
+    /* ── tabs ── */
+    [data-baseweb="tab-list"] {
+        gap: 0;
+        border-bottom: 2px solid var(--border);
+        margin-bottom: 1rem;
+    }
+    button[role="tab"] {
+        border-radius: 0 !important;
+        border: none !important;
+        border-bottom: 2px solid transparent !important;
+        background: transparent !important;
+        color: var(--muted) !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        padding: 0.6rem 1.1rem !important;
+        margin-bottom: -2px !important;
+        transition: all 0.15s ease !important;
+    }
+    button[role="tab"]:hover {
+        color: var(--ink) !important;
+    }
+    button[role="tab"][aria-selected="true"] {
+        background: transparent !important;
+        border-bottom: 2px solid var(--red) !important;
+        color: var(--red) !important;
+    }
+
+    /* ── hero header ── */
+    .hero-shell {
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        padding: 0.8rem 0 0.6rem 0;
+        margin-bottom: 0.6rem;
+    }
+    .hero-kicker {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--red);
+        font-weight: 700;
+        margin-bottom: 0.15rem;
     }
     .main-title {
-        font-size: 2.2rem;
+        font-size: 1.8rem;
         font-weight: 700;
-        color: #8c2f39;
+        color: var(--ink);
         margin-bottom: 0;
         letter-spacing: -0.5px;
     }
     .subtitle {
-        color: #555;
-        font-size: 1.0rem;
-        margin-bottom: 0.5rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 0;
     }
+
+    /* ── section headers ── */
+    .section-header {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--ink);
+        border-left: 3px solid var(--red);
+        padding-left: 0.55rem;
+        margin-bottom: 0.25rem;
+    }
+
+    /* ── descriptions ── */
     .section-desc {
-        color: #666;
-        font-size: 0.88rem;
+        color: var(--muted);
+        font-size: 0.85rem;
         margin-bottom: 0.75rem;
+        line-height: 1.6;
+    }
+
+    /* ── expanders ── */
+    details[data-testid="stExpander"] {
+        background: var(--card);
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+    }
+
+    /* ── dividers ── */
+    hr {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 0.75rem 0;
+    }
+
+    /* ── footer ── */
+    .footer-bar {
+        text-align: center;
+        color: var(--subtle);
+        font-size: 0.76rem;
+        padding: 1rem 0 0.5rem 0;
+        border-top: 1px solid var(--border);
+        margin-top: 1.5rem;
+    }
+    .footer-bar b {
+        color: var(--muted);
+    }
+
+    /* ── alerts ── */
+    [data-testid="stAlert"] {
+        border-radius: 8px;
     }
     </style>
     """,
@@ -172,6 +307,57 @@ def cached_race_detail(race_id: int):
     return get_race_detail(race_id)
 
 
+F1_PALETTE = [
+    "#e10600",  # F1 red
+    "#1e3a5f",  # navy
+    "#f5a623",  # amber
+    "#00a651",  # green
+    "#7b2d8e",  # purple
+    "#2196f3",  # blue
+    "#ff6f00",  # deep orange
+    "#00897b",  # teal
+    "#546e7a",  # blue-grey
+    "#c62828",  # dark red
+    "#283593",  # indigo
+    "#ef6c00",  # orange
+]
+
+
+def polish_chart(chart: alt.Chart) -> alt.Chart:
+    return (
+        chart.configure_view(strokeOpacity=0)
+        .configure_range(category=F1_PALETTE)
+        .configure_axis(
+            labelColor="#6b7080",
+            titleColor="#2d2d35",
+            gridColor="#f0f0f3",
+            domainColor="#e5e7eb",
+            labelFontSize=11,
+            titleFontSize=12,
+            labelFont="Inter, sans-serif",
+            titleFont="Inter, sans-serif",
+        )
+        .configure_legend(
+            labelColor="#6b7080",
+            titleColor="#2d2d35",
+            orient="bottom",
+            labelFontSize=11,
+            titleFontSize=12,
+            padding=10,
+            labelFont="Inter, sans-serif",
+            titleFont="Inter, sans-serif",
+            symbolSize=80,
+        )
+        .configure_title(
+            color="#15151a",
+            anchor="start",
+            fontSize=13,
+            font="Inter, sans-serif",
+            fontWeight=600,
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Bootstrap — year bounds
 # ---------------------------------------------------------------------------
@@ -185,6 +371,15 @@ except Exception as exc:
 # Sidebar — global filters
 # ---------------------------------------------------------------------------
 with st.sidebar:
+    st.markdown(
+        '<div style="text-align:center; padding: 0.2rem 0 0.4rem 0;">'
+        '<span style="font-weight: 800; font-size: 1.3rem; color: #e10600;">F1</span>'
+        '<span style="font-size: 0.72rem; color: #6b7080; margin-left: 0.3rem; '
+        'letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;">Race Analytics</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    st.divider()
     st.markdown("### Filters")
     global_start_year, global_end_year = st.slider(
         "Season range",
@@ -203,17 +398,21 @@ with st.sidebar:
     )
     st.divider()
     st.markdown(
-        "Data source: **Neon PostgreSQL** (live queries) \n\n"
-        "Transformed by **dbt** star-schema marts."
+        "**Data source:** Neon PostgreSQL (live) \n\n"
+        "**Transform:** dbt star-schema marts \n\n"
+        "**Deploy:** Render (auto-deploy)"
     )
 
 # ---------------------------------------------------------------------------
 # Header + KPIs
 # ---------------------------------------------------------------------------
-st.markdown('<div class="main-title">F1 Race Analytics</div>', unsafe_allow_html=True)
 st.markdown(
+    '<div class="hero-shell">'
+    '<div class="hero-kicker">Formula 1 Performance Intelligence</div>'
+    '<div class="main-title">F1 Race Analytics</div>'
     '<div class="subtitle">'
     'Interactive dashboard powered by live Neon PostgreSQL queries and dbt marts.'
+    '</div>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -253,7 +452,7 @@ with tab_perf:
                 '</p>', unsafe_allow_html=True)
 
     # Driver points trend
-    st.markdown("#### Driver Points Trend")
+    st.markdown('<div class="section-header">Driver Points Trend</div>', unsafe_allow_html=True)
     st.caption(
         "Total championship points scored by each driver per season. "
         "Use the multiselect below to compare specific drivers side by side — "
@@ -286,7 +485,7 @@ with tab_perf:
         ).encode(
             tooltip=["season_year", "driver_full_name", "total_points"],
         ).properties(height=370).interactive()
-        st.altair_chart(trend_chart, use_container_width=True)
+        st.altair_chart(polish_chart(trend_chart), use_container_width=True)
 
     st.divider()
 
@@ -294,7 +493,7 @@ with tab_perf:
     col_cc, col_th = st.columns(2)
 
     with col_cc:
-        st.markdown("#### Constructor Comparison")
+        st.markdown('<div class="section-header">Constructor Comparison</div>', unsafe_allow_html=True)
         st.caption(
             "Total points and race wins for each constructor (team) in a single season. "
             "Bar length shows points; color intensity shows win count — darker bars indicate "
@@ -325,10 +524,10 @@ with tab_perf:
                 )
                 .properties(height=340)
             )
-            st.altair_chart(cc_chart, use_container_width=True)
+            st.altair_chart(polish_chart(cc_chart), use_container_width=True)
 
     with col_th:
-        st.markdown("#### Team Historic Trend")
+        st.markdown('<div class="section-header">Team Historic Trend</div>', unsafe_allow_html=True)
         st.caption(
             "Constructor points over multiple seasons. Useful for spotting dominance eras — "
             "e.g. Ferrari in the early 2000s, Red Bull 2010-2013, or Mercedes 2014-2020."
@@ -361,7 +560,7 @@ with tab_perf:
             ).encode(
                 tooltip=["season_year", "constructor_name", "total_points", "wins"],
             ).properties(height=340).interactive()
-            st.altair_chart(team_chart, use_container_width=True)
+            st.altair_chart(polish_chart(team_chart), use_container_width=True)
 
 
 # ── Tab 2: Strategy & Overperformers ──────────────────────────────────────
@@ -371,7 +570,7 @@ with tab_strategy:
                 '</p>', unsafe_allow_html=True)
 
     # Overperformer leaderboard
-    st.markdown("#### Qualifying Overperformer Leaderboard")
+    st.markdown('<div class="section-header">Qualifying Overperformer Leaderboard</div>', unsafe_allow_html=True)
     st.markdown(
         '<p class="section-desc">'
         "In F1, qualifying determines the starting grid. Some drivers consistently "
@@ -420,7 +619,7 @@ with tab_strategy:
                 color=alt.Color(
                     "gain_races:Q",
                     title="Races with Gain",
-                    scale=alt.Scale(scheme="greens"),
+                    scale=alt.Scale(scheme="oranges"),
                 ),
                 tooltip=[
                     "driver_full_name",
@@ -431,12 +630,12 @@ with tab_strategy:
             )
             .properties(height=380)
         )
-        st.altair_chart(ov_chart, use_container_width=True)
+        st.altair_chart(polish_chart(ov_chart), use_container_width=True)
 
     st.divider()
 
     # Pit stop scatter
-    st.markdown("#### Pit Stop Time vs Finish Gain")
+    st.markdown('<div class="section-header">Pit Stop Time vs Finish Gain</div>', unsafe_allow_html=True)
     st.markdown(
         '<p class="section-desc">'
         "Does faster pit work translate into better race results? Each dot represents one "
@@ -489,7 +688,7 @@ with tab_strategy:
             .properties(height=400)
             .interactive()
         )
-        st.altair_chart(pit_chart, use_container_width=True)
+        st.altair_chart(polish_chart(pit_chart), use_container_width=True)
 
 
 # ── Tab 3: Season Standings ───────────────────────────────────────────────
@@ -519,7 +718,7 @@ with tab_standings:
     # Charts
     chart_c1, chart_c2 = st.columns(2)
     with chart_c1:
-        st.markdown("#### Driver Championship")
+        st.markdown('<div class="section-header">Driver Championship</div>', unsafe_allow_html=True)
         if driver_pts_df.empty:
             st.info("No driver standings data.")
         else:
@@ -529,15 +728,19 @@ with tab_standings:
                 .encode(
                     x=alt.X("total_points:Q", title="Points"),
                     y=alt.Y("driver_full_name:N", sort="-x", title=""),
-                    color=alt.value("#c0392b"),
+                    color=alt.Color(
+                        "total_points:Q",
+                        scale=alt.Scale(scheme="reds"),
+                        legend=None,
+                    ),
                     tooltip=["driver_full_name", "total_points", "wins", "podiums"],
                 )
                 .properties(height=340)
             )
-            st.altair_chart(d_chart, use_container_width=True)
+            st.altair_chart(polish_chart(d_chart), use_container_width=True)
 
     with chart_c2:
-        st.markdown("#### Constructor Championship")
+        st.markdown('<div class="section-header">Constructor Championship</div>', unsafe_allow_html=True)
         if constructor_pts_df.empty:
             st.info("No constructor standings data.")
         else:
@@ -547,12 +750,16 @@ with tab_standings:
                 .encode(
                     x=alt.X("total_points:Q", title="Points"),
                     y=alt.Y("constructor_name:N", sort="-x", title=""),
-                    color=alt.value("#2c3e50"),
+                    color=alt.Color(
+                        "total_points:Q",
+                        scale=alt.Scale(scheme="blues"),
+                        legend=None,
+                    ),
                     tooltip=["constructor_name", "total_points", "wins", "podiums"],
                 )
                 .properties(height=340)
             )
-            st.altair_chart(c_chart, use_container_width=True)
+            st.altair_chart(polish_chart(c_chart), use_container_width=True)
 
     # Full tables underneath
     with st.expander("Full standings tables", expanded=False):
@@ -606,21 +813,22 @@ with tab_tracks:
                 )
                 dom_chart = (
                     alt.Chart(wins_by_team)
-                    .mark_arc(innerRadius=50)
+                    .mark_arc(innerRadius=55, outerRadius=120, stroke="#fff", strokeWidth=2)
                     .encode(
-                        theta=alt.Theta("wins:Q"),
+                        theta=alt.Theta("wins:Q", stack=True),
                         color=alt.Color(
                             "winner_constructor:N",
                             title="Constructor",
+                            scale=alt.Scale(range=F1_PALETTE),
                             sort=alt.EncodingSortField("wins", order="descending"),
                         ),
                         tooltip=["winner_constructor", "wins"],
                     )
-                    .properties(height=300, title=f"Wins at {selected_circuit}")
+                    .properties(height=300, title=f"Constructor Dominance — {selected_circuit}")
                 )
-                st.altair_chart(dom_chart, use_container_width=True)
+                st.altair_chart(polish_chart(dom_chart), use_container_width=True)
 
-            st.markdown("#### Race-by-Race Winners")
+            st.markdown('<div class="section-header">Race-by-Race Winners</div>', unsafe_allow_html=True)
             st.dataframe(
                 track_df.rename(columns={
                     "season_year": "Year",
@@ -695,7 +903,7 @@ with tab_races:
                     .properties(height=380, title="Grid vs Finish Position")
                     .interactive()
                 )
-                st.altair_chart(slope_chart, use_container_width=True)
+                st.altair_chart(polish_chart(slope_chart), use_container_width=True)
 
             with st.expander("Full race results", expanded=True):
                 st.dataframe(
@@ -714,7 +922,12 @@ with tab_races:
                     hide_index=True,
                 )
 
-st.caption(
-    f"F1 Race Analytics | Seasons {global_start_year}–{global_end_year} | "
-    "Live queries against Neon PostgreSQL, transformed by dbt."
+st.markdown(
+    f'<div class="footer-bar">'
+    f'F1 Race Analytics &mdash; Seasons {global_start_year}&ndash;{global_end_year} '
+    f'&middot; Live queries against <b>Neon PostgreSQL</b>, transformed by <b>dbt</b> '
+    f'&middot; Deployed on <b>Render</b> &middot; '
+    f'Built for EAS 550 &mdash; DMQL'
+    f'</div>',
+    unsafe_allow_html=True,
 )
