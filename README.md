@@ -1,6 +1,6 @@
 # F1 Race Analytics
 
-A cloud-native data engineering pipeline over seven decades of Formula 1 racing data. Built for **EAS 550 — Data Mining Query Language** as a multi-phase group project covering relational modeling, dimensional modeling with dbt, automated data quality, CI/CD, and query performance tuning.
+A cloud-native data engineering pipeline over seven decades of Formula 1 racing data. Built for **EAS 550 — Data Mining Query Language** as a multi-phase group project covering relational modeling, dimensional modeling with dbt, automated data quality, CI/CD, query performance tuning, and public dashboard deployment.
 
 ## Team
 
@@ -26,7 +26,10 @@ A cloud-native data engineering pipeline over seven decades of Formula 1 racing 
                                Analytical SQL + performance tuning
                                           │
                                           ▼
-                             GitHub Actions (SQLFluff lint + dbt build/test)
+                             Streamlit dashboard (live Neon queries)
+                                          │
+                                          ▼
+                             Render deployment + GitHub auto-deploy
 ```
 
 ## Tech Stack
@@ -36,11 +39,12 @@ A cloud-native data engineering pipeline over seven decades of Formula 1 racing 
 | Storage | Neon (serverless PostgreSQL) |
 | Ingestion | Python, Pandas, SQLAlchemy, psycopg2 |
 | Transformation & Tests | dbt Core (postgres), `dbt_utils` |
+| Application | Streamlit + Altair |
 | Linting | SQLFluff (with dbt templater) |
-| CI/CD | GitHub Actions |
+| CI/CD | GitHub Actions + Render auto-deploy |
 | Performance | `EXPLAIN (ANALYZE, BUFFERS)`, composite B-tree indexes |
 
-## Validation Snapshot (Phase 2)
+## Validation Snapshot (Phase 2 + 3)
 
 | Check | Result |
 | --- | --- |
@@ -49,12 +53,19 @@ A cloud-native data engineering pipeline over seven decades of Formula 1 racing 
 | `sqlfluff lint dbt/models` | Passed |
 | `sqlfluff lint sql/analysis` | Passed |
 | Query B tuning | 84.163 ms → 46.564 ms (**44.67% faster**) |
+| Streamlit app | Implemented with 3 interactive charts + cached DB queries |
+| Render config | `render.yaml` included for continuous deployment |
 
 ## Repository Layout
 
 ```
 .
 ├── .github/workflows/ci.yml         # SQLFluff lint + dbt build/test on PR
+├── .streamlit/config.toml           # Streamlit theme + server config
+├── app/
+│   ├── db.py                        # SQLAlchemy pooled Neon connector
+│   ├── queries.py                   # Parameterized SQL for dashboard
+│   └── streamlit_app.py             # Phase 3 Streamlit dashboard
 ├── dbt/
 │   ├── dbt_project.yml
 │   ├── packages.yml
@@ -81,6 +92,7 @@ A cloud-native data engineering pipeline over seven decades of Formula 1 racing 
 ├── DMQL_PHASE_1_REPORT.pdf          # Phase 1 justification report
 ├── requirements.txt                 # Runtime deps
 ├── requirements-dev.txt             # Lint/dbt deps
+├── render.yaml                      # Render Blueprint for app deployment
 └── README.md
 ```
 
@@ -184,6 +196,43 @@ SQLFluff rules live in [`.sqlfluff`](.sqlfluff) (Postgres dialect, dbt templater
 
 ---
 
+## Phase 3 — Application Layer & Cloud Deployment
+
+### Application (Streamlit)
+- Entry point: [`app/streamlit_app.py`](app/streamlit_app.py)
+- Secure DB connector: [`app/db.py`](app/db.py)
+- Query layer: [`app/queries.py`](app/queries.py)
+
+Implemented requirements:
+- At least 2 distinct dynamic visualizations:
+  - Driver points trend by season (multi-line chart)
+  - Constructor ranking by points for selected season (bar chart)
+  - Pit stop time vs adjusted finish gain (interactive scatter)
+- At least 1 interactive widget:
+  - Season range slider (plus driver/constructor/circuit multiselects)
+- Streamlit caching:
+  - `@st.cache_data` used for filter option lists and query results
+- Live database access:
+  - Queries execute against Neon tables/views (`mart_*`, `dim_*`) with SQLAlchemy pooling.
+  - No flat-file reads inside the app.
+
+### Secure database access
+`app/db.py` configures:
+- `QueuePool` (`pool_size=3`, `max_overflow=2`)
+- `pool_pre_ping=True`
+- `pool_recycle=300`
+- statement timeout via `connect_args`
+
+All credentials are environment-based (`DATABASE_URL`), never hardcoded.
+
+### Render deployment
+- Blueprint config: [`render.yaml`](render.yaml)
+- Start command:
+  - `streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=$PORT --server.headless=true`
+- Render should be connected to GitHub with auto-deploy enabled from the default branch.
+
+---
+
 ## Getting Started
 
 ### 1. Install dependencies
@@ -230,14 +279,22 @@ dbt docs generate --project-dir dbt --profiles-dir dbt
 dbt docs serve    --project-dir dbt --profiles-dir dbt
 ```
 
-### 5. Lint locally
+### 5. Run the Phase 3 dashboard locally
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+The dashboard reads from Neon via `DATABASE_URL`, so ensure your DB is loaded and dbt models are built first.
+
+### 6. Lint locally
 
 ```bash
 sqlfluff lint dbt/models   --config .sqlfluff
 sqlfluff lint sql/analysis --dialect postgres --templater jinja
 ```
 
-### 6. Reproduce the Query B performance study
+### 7. Reproduce the Query B performance study
 
 ```bash
 psql "$DATABASE_URL" -P pager=off -f sql/performance/query_b_baseline_explain.sql

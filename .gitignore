@@ -8,3 +8,6 @@ dbt/logs/
 dbt/.user.yml
 
 EAS 550 Project-1pdf.pdf
+
+__pycache__/
+*.pyc
