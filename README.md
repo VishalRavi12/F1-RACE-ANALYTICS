@@ -230,6 +230,32 @@ All credentials are environment-based (`DATABASE_URL`), never hardcoded.
 - Start command:
   - `streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=$PORT --server.headless=true`
 - Render should be connected to GitHub with auto-deploy enabled from the default branch.
+- Live app URL:
+  - https://f1-race-analytics.onrender.com/
+  - Note: Render free tier may cold-start for up to ~60 seconds after inactivity.
+
+### Dashboard screenshots
+#### Live dashboard overview
+![Live dashboard overview](docs/screenshots/01-live-dashboard-overview.png)
+
+#### Strategy and overperformers
+![Strategy and overperformers](docs/screenshots/02-strategy-overperformers.png)
+
+#### Season standings
+![Season standings](docs/screenshots/03-season-standings.png)
+
+#### Circuits and history
+![Circuits and history](docs/screenshots/04-circuits-history.png)
+
+#### Race explorer
+![Race explorer](docs/screenshots/05-race-explorer.png)
+
+#### Render deployment evidence
+![Render events](docs/screenshots/06-render-events.png)
+![Render logs](docs/screenshots/07-render-logs.png)
+
+### Demo video
+- End-to-end demo: _Add your final video link here_
 
 ---
 
