@@ -489,49 +489,49 @@ with tab_perf:
 
     st.divider()
 
-    # Constructor + Team historic side by side
-    col_cc, col_th = st.columns(2)
-
-    with col_cc:
-        st.markdown('<div class="section-header">Constructor Comparison</div>', unsafe_allow_html=True)
-        st.caption(
-            "Total points and race wins for each constructor (team) in a single season. "
-            "Bar length shows points; color intensity shows win count — darker bars indicate "
-            "teams that converted points into victories."
-        )
-        cc_season = st.selectbox(
-            "Season",
-            options=list(range(global_end_year, global_start_year - 1, -1)),
-            key="cc_season",
-        )
-        cc_top_n = st.slider("Top N", 5, 20, 10, key="cc_top_n")
-        constructor_df = cached_constructor_comparison(cc_season, cc_top_n)
-        if constructor_df.empty:
-            st.info("No data for this season.")
-        else:
-            cc_chart = (
-                alt.Chart(constructor_df)
-                .mark_bar(cornerRadiusEnd=4)
-                .encode(
-                    x=alt.X("total_points:Q", title="Points"),
-                    y=alt.Y("constructor_name:N", sort="-x", title=""),
-                    color=alt.Color(
-                        "wins:Q",
-                        title="Wins",
-                        scale=alt.Scale(scheme="reds"),
-                    ),
-                    tooltip=["constructor_name", "total_points", "wins"],
-                )
-                .properties(height=340)
+    # Constructor Comparison — full width
+    st.markdown('<div class="section-header">Constructor Comparison</div>', unsafe_allow_html=True)
+    st.caption(
+        "Total points and race wins for each constructor (team) in a single season. "
+        "Bar length shows points; color intensity shows win count — darker bars indicate "
+        "teams that converted points into victories."
+    )
+    cc_season = st.selectbox(
+        "Season",
+        options=list(range(global_end_year, global_start_year - 1, -1)),
+        key="cc_season",
+    )
+    constructor_df = cached_constructor_comparison(cc_season, 50)
+    if constructor_df.empty:
+        st.info("No data for this season.")
+    else:
+        cc_chart = (
+            alt.Chart(constructor_df)
+            .mark_bar(cornerRadiusEnd=4)
+            .encode(
+                x=alt.X("total_points:Q", title="Points"),
+                y=alt.Y("constructor_name:N", sort="-x", title=""),
+                color=alt.Color(
+                    "wins:Q",
+                    title="Wins",
+                    scale=alt.Scale(scheme="reds"),
+                ),
+                tooltip=["constructor_name", "total_points", "wins"],
             )
-            st.altair_chart(polish_chart(cc_chart), use_container_width=True)
-
-    with col_th:
-        st.markdown('<div class="section-header">Team Historic Trend</div>', unsafe_allow_html=True)
-        st.caption(
-            "Constructor points over multiple seasons. Useful for spotting dominance eras — "
-            "e.g. Ferrari in the early 2000s, Red Bull 2010-2013, or Mercedes 2014-2020."
+            .properties(height=max(200, len(constructor_df) * 36))
         )
+        st.altair_chart(polish_chart(cc_chart), use_container_width=True)
+
+    st.divider()
+
+    # Team Historic Trend — full width
+    st.markdown('<div class="section-header">Team Historic Trend</div>', unsafe_allow_html=True)
+    st.caption(
+        "Constructor points over multiple seasons. Useful for spotting dominance eras — "
+        "e.g. Ferrari in the early 2000s, Red Bull 2010-2013, or Mercedes 2014-2020."
+    )
+    th_c1, th_c2 = st.columns(2)
+    with th_c1:
         team_range = st.slider(
             "Season range",
             min_value=global_start_year,
@@ -539,28 +539,29 @@ with tab_perf:
             value=(max(global_start_year, global_end_year - 10), global_end_year),
             key="team_range",
         )
+    with th_c2:
         selected_teams = st.multiselect(
             "Select constructors",
             options=constructor_options,
             default=constructor_options[:5] if len(constructor_options) >= 5 else constructor_options,
             key="team_constructors",
         )
-        team_df = cached_team_historic(team_range[0], team_range[1], tuple(selected_teams))
-        if team_df.empty:
-            st.info("No team data for selected filters.")
-        else:
-            t_base = alt.Chart(team_df).encode(
-                x=alt.X("season_year:O", title="Season"),
-                y=alt.Y("total_points:Q", title="Points"),
-                color=alt.Color("constructor_name:N", title="Constructor"),
-            )
-            team_chart = (
-                t_base.mark_line(strokeWidth=2.5)
-                + t_base.mark_circle(size=45)
-            ).encode(
-                tooltip=["season_year", "constructor_name", "total_points", "wins"],
-            ).properties(height=340).interactive()
-            st.altair_chart(polish_chart(team_chart), use_container_width=True)
+    team_df = cached_team_historic(team_range[0], team_range[1], tuple(selected_teams))
+    if team_df.empty:
+        st.info("No team data for selected filters.")
+    else:
+        t_base = alt.Chart(team_df).encode(
+            x=alt.X("season_year:O", title="Season"),
+            y=alt.Y("total_points:Q", title="Points"),
+            color=alt.Color("constructor_name:N", title="Constructor"),
+        )
+        team_chart = (
+            t_base.mark_line(strokeWidth=2.5)
+            + t_base.mark_circle(size=45)
+        ).encode(
+            tooltip=["season_year", "constructor_name", "total_points", "wins"],
+        ).properties(height=380).interactive()
+        st.altair_chart(polish_chart(team_chart), use_container_width=True)
 
 
 # ── Tab 2: Strategy & Overperformers ──────────────────────────────────────
@@ -628,7 +629,7 @@ with tab_strategy:
                     "gain_races",
                 ],
             )
-            .properties(height=380)
+            .properties(height=max(250, len(overperformer_df) * 32))
         )
         st.altair_chart(polish_chart(ov_chart), use_container_width=True)
 
@@ -702,18 +703,14 @@ with tab_standings:
         unsafe_allow_html=True,
     )
 
-    s_c1, s_c2 = st.columns(2)
-    with s_c1:
-        standings_season = st.selectbox(
-            "Season",
-            options=list(range(global_end_year, global_start_year - 1, -1)),
-            key="standings_season",
-        )
-    with s_c2:
-        standings_top_n = st.slider("Top N", 5, 30, 20, key="standings_top_n")
+    standings_season = st.selectbox(
+        "Season",
+        options=list(range(global_end_year, global_start_year - 1, -1)),
+        key="standings_season",
+    )
 
-    driver_pts_df = cached_driver_final_points(standings_season, standings_top_n)
-    constructor_pts_df = cached_constructor_final_points(standings_season, standings_top_n)
+    driver_pts_df = cached_driver_final_points(standings_season, 50)
+    constructor_pts_df = cached_constructor_final_points(standings_season, 50)
 
     # Charts
     chart_c1, chart_c2 = st.columns(2)
@@ -722,8 +719,9 @@ with tab_standings:
         if driver_pts_df.empty:
             st.info("No driver standings data.")
         else:
+            d_display = driver_pts_df
             d_chart = (
-                alt.Chart(driver_pts_df.head(15))
+                alt.Chart(d_display)
                 .mark_bar(cornerRadiusEnd=4)
                 .encode(
                     x=alt.X("total_points:Q", title="Points"),
@@ -735,7 +733,7 @@ with tab_standings:
                     ),
                     tooltip=["driver_full_name", "total_points", "wins", "podiums"],
                 )
-                .properties(height=340)
+                .properties(height=max(200, len(d_display) * 28))
             )
             st.altair_chart(polish_chart(d_chart), use_container_width=True)
 
@@ -744,8 +742,9 @@ with tab_standings:
         if constructor_pts_df.empty:
             st.info("No constructor standings data.")
         else:
+            c_display = constructor_pts_df
             c_chart = (
-                alt.Chart(constructor_pts_df.head(15))
+                alt.Chart(c_display)
                 .mark_bar(cornerRadiusEnd=4)
                 .encode(
                     x=alt.X("total_points:Q", title="Points"),
@@ -757,7 +756,7 @@ with tab_standings:
                     ),
                     tooltip=["constructor_name", "total_points", "wins", "podiums"],
                 )
-                .properties(height=340)
+                .properties(height=max(200, len(c_display) * 28))
             )
             st.altair_chart(polish_chart(c_chart), use_container_width=True)
 
