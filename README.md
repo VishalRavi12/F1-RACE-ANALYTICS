@@ -255,7 +255,7 @@ All credentials are environment-based (`DATABASE_URL`), never hardcoded.
 ![Render logs](docs/screenshots/07-render-logs.png)
 
 ### Demo video
-- End-to-end demo: _Add your final video link here_
+- End-to-end demo: [link](https://youtu.be/-3Xxlm9MbIw)
 
 ---
 
